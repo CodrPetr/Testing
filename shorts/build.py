@@ -68,6 +68,11 @@ run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', listfile
 def tf(name, text):
     p = os.path.join(a.work, name + '.txt'); open(p, 'w').write(text); return p
 font, font_url = cfg['font'], cfg.get('font_url', cfg['font'])
+from PIL import ImageFont
+def fit(text, base, fontfile=None, maxw=980):
+    """Shrink a font size until the widest line fits inside the safe width."""
+    f = ImageFont.truetype(fontfile or font, base); w = max(f.getlength(l) for l in text.split('\n'))
+    return base if w <= maxw else max(36, int(base * maxw / w))
 accent = cfg.get('accent', '0xFF2D55')
 cuts = [s['at'] for s in segs[1:]]
 flash = '+'.join(f"between(t,{s['at']:.3f},{s['at'] + 0.07:.3f})" for s in segs if s['downbeat'] and s['at'] > 0) or '0'
@@ -77,7 +82,7 @@ vf = [
     f"drawbox=c=white@0.85:t=fill:enable='{flash}'",
     f"rgbashift=rh=16:bh=-16:gv=6:enable='{glitch}'",
     # hook: slams in, holds, drops out
-    f"drawtext=fontfile={font}:expansion=none:textfile={tf('hook', cfg['hook'])}:fontsize=96:fontcolor=white:line_spacing=10:"
+    f"drawtext=fontfile={font}:expansion=none:textfile={tf('hook', cfg['hook'])}:fontsize={fit(cfg['hook'], 96)}:fontcolor=white:line_spacing=10:"
     f"box=1:boxcolor={accent}@0.92:boxborderw=28:x=(w-text_w)/2:y=h*0.26-40*max(0\\,1-t*10):"
     f"alpha='if(lt(t,0.08),t/0.08,if(lt(t,{hs - 0.15}),1,max(0,({hs}-t)/0.15)))':enable='lt(t,{hs})'",
     # persistent watermark during the body
@@ -86,16 +91,16 @@ vf = [
 ]
 for i, c in enumerate(cfg['captions']):
     y = 'h*0.62' if i % 2 == 0 else 'h*0.70'
-    vf.append(f"drawtext=fontfile={font}:expansion=none:textfile={tf(f'cap{i}', c['text'])}:fontsize=88:fontcolor=black:"
+    vf.append(f"drawtext=fontfile={font}:expansion=none:textfile={tf(f'cap{i}', c['text'])}:fontsize={fit(c['text'], 88)}:fontcolor=black:"
               f"box=1:boxcolor=white@0.96:boxborderw=24:x=(w-text_w)/2+{(-1) ** i * 6}*sin(t*40):y={y}:"
               f"enable='between(t,{c['at']},{c['at'] + c['for']})'")
 vf += [
     f"drawbox=c=black@0.6:t=fill:enable='gte(t,{E})'",
-    f"drawtext=fontfile={font_url}:text={cfg['url']}:fontsize=120:fontcolor=white:borderw=4:bordercolor=black:"
+    f"drawtext=fontfile={font_url}:text={cfg['url']}:fontsize={fit(cfg['url'], 120, font_url)}:fontcolor=white:borderw=4:bordercolor=black:"
     f"x=(w-text_w)/2:y=h*0.40+30*max(0\\,1-(t-{E})*8):alpha='min(1,(t-{E})*6)':enable='gte(t,{E})'",
-    f"drawtext=fontfile={font}:expansion=none:textfile={tf('cta', cfg['cta_line'])}:fontsize=76:fontcolor=white:box=1:boxcolor={accent}@0.95:boxborderw=22:"
+    f"drawtext=fontfile={font}:expansion=none:textfile={tf('cta', cfg['cta_line'])}:fontsize={fit(cfg['cta_line'], 76)}:fontcolor=white:box=1:boxcolor={accent}@0.95:boxborderw=22:"
     f"x=(w-text_w)/2:y=h*0.40+190:alpha='min(1,max(0,(t-{E}-0.25)*6))':enable='gte(t,{E + 0.25})'",
-    f"drawtext=fontfile={font}:text=NO DOWNLOAD  •  FREE  •  IN YOUR BROWSER:fontsize=40:fontcolor=white@0.9:"
+    f"drawtext=fontfile={font}:expansion=none:textfile={tf('sub', cfg.get('cta_sub', 'NO DOWNLOAD  •  FREE  •  IN YOUR BROWSER'))}:fontsize={fit(cfg.get('cta_sub', ''), 40, maxw=1000)}:fontcolor=white@0.9:"
     f"x=(w-text_w)/2:y=h*0.40+330:alpha='min(1,max(0,(t-{E}-0.5)*6))':enable='gte(t,{E + 0.5})'",
     "vignette=PI/5",
 ]
