@@ -32,9 +32,21 @@ for f, d in sources:
     usable = d - 2.5; k = max(1, int(usable / 1.2))
     pool += [(f, 2.0 + usable * j / k, d) for j in range(k)]
 rng.shuffle(pool)
-if len(pool) < len(segs): pool = (pool * (len(segs) // len(pool) + 1))
+# A caption (or the hook) may name a footage file substring in "clip": cuts under it come from that footage.
+def wanted_clip(at):
+    if at < cfg['hook_seconds'] and cfg.get('hook_clip'): return cfg['hook_clip']
+    for c in cfg['captions']:
+        if c.get('clip') and c['at'] - 0.3 <= at < c['at'] + c['for']: return c['clip']
+    return None
+def take(clip):
+    for idx, e in enumerate(pool):
+        if clip is None or clip in os.path.basename(os.path.dirname(e[0])) or clip in os.path.basename(e[0]):
+            return pool.pop(idx)
+    return None
 for i, s in enumerate(segs):
-    f, start, d = pool[i]
+    e = take(wanted_clip(s['at'])) or take(None)
+    if e is None: pool.extend((f, 2.0 + (d - 2.5) * rng.random(), d) for f, d in sources); e = take(None)
+    f, start, d = e
     speed = 0.6 if s.get('end') else (rng.choice([1.0, 1.5, 2.0]) if s['beats'] >= 1 else 1.0)
     start = min(start, max(2.0, d - s['len'] * speed - 0.2))
     s.update(src=f, start=start, speed=speed, zoom_in=(i % 2 == 0), amt=0.08 if s.get('end') else rng.uniform(.10, .20), focus=rng.choice([.15, .5, .85]))
@@ -68,6 +80,11 @@ run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', listfile
 def tf(name, text):
     p = os.path.join(a.work, name + '.txt'); open(p, 'w').write(text); return p
 font, font_url = cfg['font'], cfg.get('font_url', cfg['font'])
+from PIL import ImageFont
+def fit(text, base, fontfile=None, maxw=980):
+    """Shrink a font size until the widest line fits inside the safe width."""
+    f = ImageFont.truetype(fontfile or font, base); w = max(f.getlength(l) for l in text.split('\n'))
+    return base if w <= maxw else max(36, int(base * maxw / w))
 from PIL import ImageFont
 def fit(text, base, fontfile=None, maxw=980):
     """Shrink a font size until the widest line fits inside the safe width."""
