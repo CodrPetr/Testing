@@ -1,0 +1,18 @@
+{
+  "bpm": 140,
+  "duration": 24,
+  "endcard": 3.2,
+  "hook": "YOU CAN PLAY THIS\nIN YOUR BROWSER",
+  "hook_seconds": 2.6,
+  "captions": [
+    { "text": "NO DOWNLOAD", "at": 4.3, "for": 1.3 },
+    { "text": "100% FREE", "at": 7.7, "for": 1.3 },
+    { "text": "JUMP IN. 10 SECONDS.", "at": 11.1, "for": 1.6 },
+    { "text": "ironveil.live", "at": 15.4, "for": 1.6 }
+  ],
+  "cta_line": "PLAY FREE NOW",
+  "url": "ironveil.live",
+  "layout": "crop",
+  "font": "/usr/share/fonts/opentype/inter/Inter-Black.otf",
+  "font_url": "/usr/share/fonts/opentype/inter/InterDisplay-Black.otf"
+}
