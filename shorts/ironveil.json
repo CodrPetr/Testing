@@ -19,6 +19,8 @@
   "cta_sub": "TANKS  •  FPV DRONES  •  AIR STRIKES  •  5 BATTLEFIELDS",
   "url": "ironveil.live",
   "layout": "crop",
+  "detail_drop": 0.45,
+  "grade": "eq=saturation=1.45:contrast=1.18:brightness=-0.02:gamma=0.95",
   "font": "/usr/share/fonts/opentype/inter/Inter-Black.otf",
   "font_url": "/usr/share/fonts/opentype/inter/InterDisplay-Black.otf"
 }

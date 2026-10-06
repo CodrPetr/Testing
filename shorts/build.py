@@ -28,9 +28,17 @@ sources = []
 for f in a.footage:
     d = probe(f); sources.append((f, d))
 pool = []
+def detail_scores(f):
+    """Per-second visual-detail score: JPEG size of a small thumbnail (busy frames compress worse)."""
+    d = os.path.join(a.work, 'thumbs', os.path.basename(os.path.dirname(f)) + '_' + os.path.splitext(os.path.basename(f))[0])
+    if not os.path.isdir(d):
+        os.makedirs(d, exist_ok=True)
+        subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', f, '-vf', 'fps=1,scale=160:-2', '-q:v', '4', os.path.join(d, '%05d.jpg')], check=True)
+    return [os.path.getsize(os.path.join(d, n)) for n in sorted(os.listdir(d))]
 for f, d in sources:
-    usable = d - 2.5; k = max(1, int(usable / 1.2))
-    pool += [(f, 2.0 + usable * j / k, d) for j in range(k)]
+    sc = detail_scores(f); cut = sorted(sc)[int(len(sc) * cfg.get('detail_drop', 0.4))] if sc else 0
+    for t in range(2, int(d - 2.5)):
+        if sc[min(t, len(sc) - 1)] >= cut: pool.append((f, float(t), d, sc[min(t, len(sc) - 1)]))
 rng.shuffle(pool)
 # A caption (or the hook) may name a footage file substring in "clip": cuts under it come from that footage.
 def wanted_clip(at):
@@ -38,15 +46,15 @@ def wanted_clip(at):
     for c in cfg['captions']:
         if c.get('clip') and c['at'] - 0.3 <= at < c['at'] + c['for']: return c['clip']
     return None
-def take(clip):
-    for idx, e in enumerate(pool):
-        if clip is None or clip in os.path.basename(os.path.dirname(e[0])) or clip in os.path.basename(e[0]):
-            return pool.pop(idx)
-    return None
+def take(clip, best=False):
+    hits = [idx for idx, e in enumerate(pool) if clip is None or clip in os.path.basename(os.path.dirname(e[0])) or clip in os.path.basename(e[0])]
+    if not hits: return None
+    idx = max(hits, key=lambda i: pool[i][3]) if best else hits[0]
+    return pool.pop(idx)
 for i, s in enumerate(segs):
-    e = take(wanted_clip(s['at'])) or take(None)
-    if e is None: pool.extend((f, 2.0 + (d - 2.5) * rng.random(), d) for f, d in sources); e = take(None)
-    f, start, d = e
+    e = take(wanted_clip(s['at']), best=s['at'] < cfg['hook_seconds']) or take(None)
+    if e is None: pool.extend((f, 2.0 + (d - 2.5) * rng.random(), d, 0) for f, d in sources); e = take(None)
+    f, start, d = e[:3]
     speed = 0.6 if s.get('end') else (rng.choice([1.0, 1.5, 2.0]) if s['beats'] >= 1 else 1.0)
     start = min(start, max(2.0, d - s['len'] * speed - 0.2))
     s.update(src=f, start=start, speed=speed, zoom_in=(i % 2 == 0), amt=0.08 if s.get('end') else rng.uniform(.10, .20), focus=rng.choice([.15, .5, .85]))
@@ -62,7 +70,7 @@ def seg_filter(s):
                f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2")
     return (f"setpts=PTS/{s['speed']},fps={FPS},{lay},"
             f"zoompan=z='{z}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS},"
-            f"eq=saturation=1.35:contrast=1.08,unsharp=5:5:0.8,setsar=1")
+            f"{cfg.get('grade', 'eq=saturation=1.35:contrast=1.08')},unsharp=5:5:0.8,setsar=1")
 
 print(f'{len(segs)} cuts over {body:.1f}s body + {cfg["endcard"]}s end card')
 listfile = os.path.join(a.work, 'list.txt')
